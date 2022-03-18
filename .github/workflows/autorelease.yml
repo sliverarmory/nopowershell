@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+    branches: ["master"]
+
+jobs:
+
+  linux-windows-build:
+    name: CSharp Build
+    if: startsWith( github.ref, 'refs/tags/v')
+    runs-on: windows-2019
+    timeout-minutes: 45
+    steps:
+
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v1.1
+  
+    - name: Check out code
+      uses: actions/checkout@v2
+
+    - name: Git Fetch Tags
+      run: git fetch --prune --unshallow --tags -f
+
+    - name: Download Tools
+      run: |
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri https://github.com/stedolan/jq/releases/download/jq-1.6/jq-win64.exe -OutFile jq.exe
+        Invoke-WebRequest -Uri https://github.com/moloch--/minisign/releases/download/v0.2.1/minisign.exe -OutFile minisign.exe
+
+    - name: MSBuild
+      run: |
+        nuget.exe restore .\Source\NoPowerShell.sln
+        msbuild.exe .\Source\NoPowerShell.sln /p:Configuration=Release /p:Platform="x64" /p:OutputPath=compiled/ /p:AssemblyName=NoPowerShell.x64
+        msbuild.exe .\Source\NoPowerShell.sln /p:Configuration=Release /p:Platform="x86" /p:OutputPath=compiled/ /p:AssemblyName=NoPowerShell.x86
+        Copy-Item -Path .\Source\NoPowerShell\compiled\NoPowerShell.x64.exe -Destination compiled\NoPowerShell.x64.exe
+        Copy-Item -Path .\Source\NoPowerShell\compiled\NoPowerShell.x86.exe -Destination compiled\NoPowerShell.x86.exe
+
+    - name: Build Package
+      # Powershell is utter fucking trash.
+      run: |
+        ls
+        $Version = git.exe describe --tags --abbrev=0
+        $Version = "`"$Version`""
+        Get-Content -Path alias.json | .\jq.exe ".version |= `"$Version`"" > ./compiled/alias.json
+        Copy-Item -Path LICENSE -Destination compiled\LICENSE
+        cd compiled
+        tar.exe -czvf ..\nps.tar.gz .
+
+    - name: Sign Package
+      run: |
+        Write-Output "${{ secrets.MINISIGN_PRIVATE_KEY }}" > minisign.key
+        $Content1 = Get-Content -Path ./compiled/alias.json
+        $Bytes = [System.Text.Encoding]::UTF8.GetBytes($Content1)
+        $Encoded = [System.Convert]::ToBase64String($Bytes)
+        .\minisign.exe -s minisign.key -S -m nps.tar.gz -t "$Encoded" -x nps.minisig
+
+    - name: "Publish Release"
+      uses: "marvinpinto/action-automatic-releases@latest"
+      with:
+        repo_token: "${{ secrets.GITHUB_TOKEN }}"
+        prerelease: false
+        files: |
+          nps.minisig
+          nps.tar.gz
