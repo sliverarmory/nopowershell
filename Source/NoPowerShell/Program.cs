@@ -26,6 +26,7 @@ namespace NoPowerShell
 #else
     partial class Program
     {
+        [STAThread] // Required for the *-Clipboard cmdlets
         public static void Main(string[] args)
         {
 #endif
@@ -63,6 +64,7 @@ namespace NoPowerShell
                     BeaconConsole.WriteLine(error);
 #else
                     WriteError(error);
+                    return;
 #endif
                 }
             }
@@ -116,21 +118,42 @@ namespace NoPowerShell
             }
         }
 
-        static void WriteError(string error)
+        public static void WriteError(string error, params object[] args)
         {
+            // Save existing color
             ConsoleColor BackgroundColor = Console.BackgroundColor;
             ConsoleColor ForegroundColor = Console.ForegroundColor;
+
+            // Change color to error text
             Console.BackgroundColor = ConsoleColor.Black;
             Console.ForegroundColor = ConsoleColor.Red;
 
-            Console.Error.WriteLine(error);
+            Console.WriteLine(error, args);
 
+            // Revert colors
             Console.BackgroundColor = BackgroundColor;
             Console.ForegroundColor = ForegroundColor;
         }
 
-        public static readonly string VERSION = "1.23";
-        public static readonly string WEBSITE = "https://github.com/bitsadmin";
+        public static void WriteWarning(string warning, params object[] args)
+        {
+            // Save existing color
+            ConsoleColor BackgroundColor = Console.BackgroundColor;
+            ConsoleColor ForegroundColor = Console.ForegroundColor;
+
+            // Change color to error text
+            Console.BackgroundColor = ConsoleColor.Black;
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+
+            Console.WriteLine(warning, args);
+
+            // Revert colors
+            Console.BackgroundColor = BackgroundColor;
+            Console.ForegroundColor = ForegroundColor;
+        }
+
+        public static readonly string VERSION = "1.25";
+        public static readonly string WEBSITE = "https://github.com/bitsadmin/nopowershell";
 #if !DLLBUILD
         private static readonly string USAGE = "Usage: NoPowerShell.exe [Command] [Parameters] | [Command2] [Parameters2] etc.\r\n";
         private static readonly string HELP = "\r\nExecute NoPowerShell without parameters to list all available cmdlets.";
