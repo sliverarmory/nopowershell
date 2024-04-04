@@ -42,8 +42,7 @@ jobs:
       run: |
         ls
         $Version = git.exe describe --tags --abbrev=0
-        $Version = "`"$Version`""
-        Get-Content -Path alias.json | .\jq.exe ".version |= `"$Version`"" > ./compiled/alias.json
+        Get-Content -Path alias.json | .\jq.exe --arg ver "$Version" '.version |= $ver' > ./compiled/alias.json
         Copy-Item -Path LICENSE -Destination compiled\LICENSE
         cd compiled
         tar.exe -czvf ..\nps.tar.gz .
